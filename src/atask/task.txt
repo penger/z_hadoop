@@ -1,0 +1,79 @@
+1.InputFormat是用于处理各种数据源的。下面实现自定义的InputFormat，数据源是来自于内存。
+1.1 在程序的job.setInputFormatClass(MySelfInputFormat.class);
+1.2 实现InputFormat extends InputFormat<k,v>，实现其中的2个方法，分别是getSplits(..)和createRecordReader(..)
+1.3 getSplits(...)返回的是java.util.List<T>，里面中的每个元素是InputSplit。每个InputSpilt对应一个mapper任务。
+1.4 InputSplit是对原始海量数据源的划分。本例中是在内存中产生数据，封装到InputSplit中。
+1.5 InputSplit封装的必须是hadoop数据类型，实现Writable接口。
+1.6 RecordReader读取每个InputSplit中的数据，解析成一个个的<k,v>，供map处理。
+1.7 RecordReader有4个核心方法，分别是initialize(...)，nextKeyValue(),getCurrentKey()和getCurrentValue()。
+1.8 initialize(...)的重要性在于拿到InputSplit和定义临时变量。
+1.9 nextKeyValue(...)方法的每次调用可以获得key和value值
+1.10 当nextKeyValue(...)调用后，紧接着调用getCurrentKey()和getCurrentValue()。
+--------------------------------------------------------------------------------
+作业1：自定义InputFormat，实现从linux本地文件/etc/profile读取数据，然后进行单词统计。
+--------------------------------------------------------------------------------
+2.OutputFormat是用于处理各种输出目的地的。
+2.1 OutputFormat需要写出去的键值对，是来自于Reducer类，是通过RecordWriter获得的。
+2.2 RecordWriter中的write(...)方法只有k和v，写到哪里去哪？这要通过单独传入OutputStream来处理。write就是把k和v写入到OutputStream中的。
+2.3 RecordWriter类位于OutputFormat中的。因此，我们自定义的OutputFromat必须继承OutputFormat类型。那么，流对象必须在getRecordWriter(...)方法中获得。
+--------------------------------------------------------------------------------
+作业2：自定义OutputFormat，实现单词统计，把输出记录写入到2个文件中，文件名分别是a和b。
+--------------------------------------------------------------------------------
+作业3：对以下三列数据进行降序排列(第一列相同时，第二列降序；第二列相同时，第三列降序)
+3	3	3
+3	2	4
+3	2	0
+2	2	1
+2	1	4
+1	1	0
+--------------------------------------------------------------------------------
+作业4：在自定义分组的例子中，按照第二列分组，取最大值/最小值
+--------------------------------------------------------------------------------
+
+
+3.reduce端join
+-------file1[ID	NAME]--------  
+1	zhangsan
+2	lisi
+3	wangwu
+
+
+-------file2[ID	VALUE]--------
+1	45
+2	56
+3	89
+
+
+-------结果[NAME VALUE]------------
+zhagnsan	45
+lisi	56
+wangwu	89
+
+
+问：当map读取原始文件时，能不能区分出是file1还是file2？
+答：能。FileSplit fileSplit = (FileSplit)context.getInputSplit();
+        String path =  fileSplit.getPath().toString();
+
+问：map阶段如何打标记？
+答：当我们判断出是file1时，对v2做标记，让v2的值是#zhagnsan；如果是fiel2是，让v2的值是*45
+--------------------------------------------------------------------------------
+作业5：使用reduce端join方法完成统计
+--------------------------------------------------------------------------------
+
+
+
+
+4.map端join
+适用场景：小表可以全部读取放到内存中。两个在内存中装不下的大表，不适合map端join。
+
+
+在一个TaskTracker中可以运行多个map任务。每个map任务是一个java进程，如果每个map从HDFS中读取相同的小表内容，就有些浪费了。
+使用DistributedCache，小表内容可以加载在TaskTracker的linux磁盘上。每个map运行时只需要从linux磁盘加载数据就行了，不必每次从HDFS加载。
+
+问：如何使用DistributedCache哪？
+答：1.把文件上传到HDFS中
+    2.在job.waitForCompletion(...)代码之前写DistributedCache.addCacheFile(hdfs路径, conf);
+    3.在MyMapper类的setup(...)方法中使用DistributedCache.getLocalCacheFiles()获得文件的路径，读取文件内容
+--------------------------------------------------------------------------------
+作业6：数据文件还是作业5的，把file1上传到hdfs中，使用DistributedCache完成统计
+--------------------------------------------------------------------------------

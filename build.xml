@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="项目名称" basedir="." default="sshexec">
+	<description>本配置文件供ANT编译项目、自动进行单元测试、打包并部署之用。</description>
+	<description>默认操作(输入命令：ant)为编译源程序并发布运行。</description>
+
+	<!--属性设置-->
+	<property environment="env" />
+	<property file="build.properties" />
+	<property name="src.dir" value="${basedir}/src" />
+	<property name="java.lib.dir" value="${env.JAVA_HOME}/lib" />
+	<property name="classes.dir" value="${basedir}/classes" />
+	<property name="dist.dir" value="${basedir}/dist" />
+	<property name="project.lib.dir" value="${basedir}/lib" />
+	<property name="localpath.dir" value="${basedir}" />
+	<property name="remote.host" value="192.168.114.137"/>
+	<property name="remote.username" value="penger"/>
+	<property name="remote.password" value="1"/>
+	<property name="remote.home" value="/home/penger/software/gp"/>
+	<!--每次需要知道的main类，写到这里-->
+	<property name="main.class" value="atask.tasktwo.Task2"/>
+
+	<!-- 基本编译路径设置 -->
+	<path id="compile.classpath">
+		<fileset dir="${java.lib.dir}">
+			<include name="tools.jar" />
+		</fileset>
+		<fileset dir="${project.lib.dir}">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+
+	<!-- 运行路径设置 -->
+	<path id="run.classpath">
+		<path refid="compile.classpath" />
+		<pathelement location="${classes.dir}" />
+	</path>
+	<!-- 清理,删除临时目录 -->
+	<target name="clean" description="清理,删除临时目录">
+		<!--delete dir="${build.dir}" /-->
+		<delete dir="${dist.dir}" />
+		<delete dir="${classes.dir}" />
+		<echo level="info">清理完毕</echo>
+	</target>
+	<!-- 初始化,建立目录,复制文件 -->
+	<target name="init" depends="clean" description="初始化,建立目录,复制文件">
+		<mkdir dir="${classes.dir}" />
+		<mkdir dir="${dist.dir}" />
+	</target>
+	<!-- 编译源文件-->
+	<target name="compile" depends="init" description="编译源文件">
+		<javac srcdir="${src.dir}" destdir="${classes.dir}" source="1.6" target="1.6"  includeAntRuntime="false">
+			<compilerarg line="-encoding UTF-8 "/> 
+			<classpath refid="compile.classpath" />
+		</javac>
+	</target>
+
+	<!-- 打包类文件 -->
+	<target name="jar" depends="compile" description="打包类文件">
+		<jar jarfile="${dist.dir}/jar.jar">
+			<fileset dir="${classes.dir}" includes="**/*.*" />
+		</jar>
+	</target>
+	
+	<!--上传到服务器
+	**需要把lib目录下的jsch-0.1.51拷贝到$ANT_HOME/lib下，如果是Eclipse下的Ant环境必须在Window->Preferences->Ant->Runtime->Classpath中加入jsch-0.1.51。
+	-->
+	<target name="ssh" depends="jar">
+		<scp file="${dist.dir}/jar.jar" todir="${remote.username}@${remote.host}:${remote.home}" password="${remote.password}" trust="true"/>
+	</target>
+	
+	<target name="sshexec" depends="ssh">
+	      <sshexec host="${remote.host}" username="${remote.username}"  password="${remote.password}" trust="true" command=" source /etc/profile; hadoop jar ${remote.home}/jar.jar ${main.class} m.txt output"/>
+		<!-- 
+	      <sshexec host="${remote.host}" username="${remote.username}"  password="${remote.password}" trust="true" command=" mkdir abc;mkdir cdef"/>
+	      <sshexec host="${remote.host}" username="${remote.username}"  password="${remote.password}" trust="true" command=" source /home/penger/.bashrc"/>
+	      <sshexec host="${remote.host}" username="${remote.username}"  password="${remote.password}" trust="true" command="hadoop jar ${remote.home}/jar.jar ${main.class} m2.txt output"/>
+		-->
+	</target>
+</project>
